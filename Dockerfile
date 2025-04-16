@@ -1,27 +1,34 @@
-FROM quay.io/pypa/manylinux2014_x86_64 AS test
+ARG PYTHON_BIN=/opt/python/cp311-cp311/bin
 
-ENV PATH="/opt/python/cp311-cp311/bin:$PATH"
-RUN python -m pip install --upgrade pip
+
+FROM quay.io/pypa/manylinux_2_34_x86_64 AS dev
+
+ARG PYTHON_BIN
+
+ENV PATH="${PYTHON_BIN}:$PATH"
+
+RUN yum install -y openssh-clients git bash-completion
+RUN curl -fsSL https://download.docker.com/linux/centos/docker-ce.repo \
+    -o /etc/yum.repos.d/docker-ce.repo \
+    && yum install -y docker-ce-cli
+RUN python -m pip install --upgrade pip twine
+COPY requirements.txt requirements.txt
+RUN pip install -r requirements.txt
+
+
+FROM quay.io/pypa/manylinux_2_34_x86_64 AS build
+
+ARG PYTHON_BIN
+
+ENV PATH="${PYTHON_BIN}:$PATH"
+
+RUN python -m pip install --upgrade pip twine
 
 WORKDIR /app
 
 COPY requirements.txt requirements.txt
 RUN pip install -r requirements.txt
-COPY async_typer async_typer
-COPY pyproject.toml pyproject.toml
-COPY README.md README.md
-COPY tox.ini tox.ini
+COPY async_typer ./async_typer
+COPY pyproject.toml README.md tox.ini ./
 RUN tox
-
-
-FROM quay.io/pypa/manylinux2014_x86_64 AS build
-
-ENV PATH="/opt/python/cp311-cp311/bin:$PATH"
-RUN python -m pip install --upgrade pip
-
-WORKDIR /app
-
-COPY async_typer async_typer
-COPY pyproject.toml pyproject.toml
-COPY README.md README.md
 RUN python -m build
